@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { fetchWeather, getCachedLastWeather, getCachedLastCity } from '../services/api';
 
 const STORAGE_UNIT_KEY = 'weatherpulse_unit';
+const AUTO_REFRESH_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes auto-refresh
 
 export function useWeather() {
   const [weatherData, setWeatherData] = useState(null);
@@ -9,6 +10,11 @@ export function useWeather() {
   const [error, setError] = useState(null);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
   const [isCached, setIsCached] = useState(false);
+
+  // Keep references to active location and timestamp for auto-sync & day rollover
+  const activeCityRef = useRef(null);
+  const lastFetchTimeRef = useRef(Date.now());
+  const lastCalendarDayRef = useRef(new Date().toDateString());
 
   // Initial unit from localStorage (persisted across sessions), defaulting to Celsius
   const [unit, setUnit] = useState(() => {
@@ -60,6 +66,9 @@ export function useWeather() {
     if (showSpinner) setLoading(true);
     setError(null);
 
+    // Track active coordinates for periodic background refresh
+    activeCityRef.current = { lat, lon, name: cityName };
+
     // If offline, try immediate cache
     if (!navigator.onLine) {
       const cached = getCachedLastWeather();
@@ -75,6 +84,8 @@ export function useWeather() {
       const { data, fromCache } = await fetchWeather(lat, lon, cityName);
       setWeatherData(data);
       setIsCached(fromCache);
+      lastFetchTimeRef.current = Date.now();
+      lastCalendarDayRef.current = new Date().toDateString();
     } catch (err) {
       console.error('Failed to load city:', err);
       // Fallback to cache if available
@@ -91,13 +102,13 @@ export function useWeather() {
     }
   }, []);
 
-  // Initial load
+  // 1. Initial Load on Mount
   useEffect(() => {
     const cachedCity = getCachedLastCity();
     const cachedWeather = getCachedLastWeather();
 
     if (cachedWeather) {
-      // Show cached weather immediately for instant load
+      // Show cached weather immediately for instantaneous first paint
       setWeatherData(cachedWeather);
       setIsCached(true);
       setLoading(false);
@@ -107,13 +118,75 @@ export function useWeather() {
       if (cachedCity && cachedCity.lat && cachedCity.lon) {
         loadCity(cachedCity.lat, cachedCity.lon, cachedCity.name, !cachedWeather);
       } else {
-        // Default to London or Tokyo
-        loadCity(51.5074, -0.1278, 'London', !cachedWeather);
+        // Default to London, Karachi, or Tokyo
+        loadCity(24.8608, 67.0104, 'Karachi', !cachedWeather);
       }
     } else {
       setIsOffline(true);
       setLoading(false);
     }
+  }, [loadCity]);
+
+  // 2. Continuous 15-Minute Background Auto-Refresh
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (activeCityRef.current && navigator.onLine) {
+        const { lat, lon, name } = activeCityRef.current;
+        console.log(`[Auto-Refresh] Updating live forecast for ${name || 'current city'}...`);
+        loadCity(lat, lon, name, false);
+      }
+    }, AUTO_REFRESH_INTERVAL_MS);
+
+    return () => clearInterval(timer);
+  }, [loadCity]);
+
+  // 3. Tab Visibility, Screen Unlock, and Midnight Day-Rollover Auto-Sync
+  useEffect(() => {
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === 'visible' && navigator.onLine && activeCityRef.current) {
+        const now = Date.now();
+        const currentCalendarDay = new Date().toDateString();
+        const isNewDay = currentCalendarDay !== lastCalendarDayRef.current;
+        const isStale = (now - lastFetchTimeRef.current) > (10 * 60 * 1000); // 10 mins
+
+        if (isNewDay || isStale) {
+          console.log(`[Day/Wakeup Auto-Sync] Refreshing weather (New Day: ${isNewDay}, Stale: ${isStale})...`);
+          const { lat, lon, name } = activeCityRef.current;
+          loadCity(lat, lon, name, false);
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+    window.addEventListener('focus', handleVisibilityOrFocus);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+      window.removeEventListener('focus', handleVisibilityOrFocus);
+    };
+  }, [loadCity]);
+
+  // 4. Online/Offline Network Status Listeners
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOffline(false);
+      if (activeCityRef.current) {
+        const { lat, lon, name } = activeCityRef.current;
+        loadCity(lat, lon, name, false);
+      }
+    };
+
+    const handleOffline = () => {
+      setIsOffline(true);
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
   }, [loadCity]);
 
   return {

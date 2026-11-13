@@ -31,6 +31,24 @@ export default function WeatherHero({
 
   const aqiInfo = getAqiBadge(current.aqi);
 
+  // Dynamic date calculation respecting the location's local timezone
+  const formattedDate = (() => {
+    try {
+      return new Date().toLocaleDateString('en-US', {
+        weekday: 'long',
+        month: 'short',
+        day: 'numeric',
+        timeZone: location.timezone && location.timezone !== 'auto' ? location.timezone : undefined
+      });
+    } catch {
+      return new Date().toLocaleDateString('en-US', {
+        weekday: 'long',
+        month: 'short',
+        day: 'numeric'
+      });
+    }
+  })();
+
   return (
     <div className="w-full max-w-6xl mx-auto px-4 pt-6">
       <div className="glass-panel rounded-3xl p-6 sm:p-10 relative overflow-hidden">
@@ -62,14 +80,10 @@ export default function WeatherHero({
               </button>
             </div>
 
-            {/* Date & Coordinates */}
+            {/* Date & Coordinates (Dynamic, updates daily) */}
             <div className="flex flex-wrap items-center gap-3 text-xs sm:text-sm text-slate-600 dark:text-slate-400 font-medium">
-              <span>
-                {new Date().toLocaleDateString('en-US', {
-                  weekday: 'long',
-                  month: 'short',
-                  day: 'numeric'
-                })}
+              <span className="font-semibold text-slate-800 dark:text-slate-200">
+                {formattedDate}
               </span>
               <span>•</span>
               <span className="font-mono text-slate-500">

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'weatherpulse-v1';
+const CACHE_NAME = 'weatherpulse-v2';
 const STATIC_APP_SHELL = [
   '/',
   '/index.html',
@@ -22,7 +22,7 @@ self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
 
-// Activate: Purge old cache versions
+// Activate: Purge old cache versions immediately
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => {
@@ -39,9 +39,22 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Fetch: Network-First with Cache Fallback for Weather API & Stale-While-Revalidate for Assets
+// Fetch: Network-First with Cache Fallback
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
+
+  // 0. In development / Vite dev server, bypass Vite internal modules and HMR
+  if (
+    url.pathname.startsWith('/@') ||
+    url.pathname.startsWith('/src/') ||
+    url.pathname.includes('/node_modules/') ||
+    url.pathname.includes('vite') ||
+    url.search.includes('import') ||
+    url.search.includes('t=') ||
+    url.search.includes('html-proxy')
+  ) {
+    return; // Let browser fetch directly from Vite dev server
+  }
 
   // 1. Weather API Calls (/api/weather/current)
   if (url.pathname.includes('/api/weather/current')) {
@@ -84,16 +97,12 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 2. Static App Shell & Assets (HTML, CSS, JS, Images, Fonts)
-  event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      const fetchPromise = fetch(event.request)
+  // 2. Navigation Requests (HTML Pages): Network-First, fallback to cached /index.html
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request)
         .then((networkResponse) => {
-          if (
-            networkResponse &&
-            networkResponse.status === 200 &&
-            event.request.method === 'GET'
-          ) {
+          if (networkResponse && networkResponse.status === 200) {
             const toCache = networkResponse.clone();
             caches.open(CACHE_NAME).then((cache) => {
               cache.put(event.request, toCache);
@@ -101,15 +110,41 @@ self.addEventListener('fetch', (event) => {
           }
           return networkResponse;
         })
-        .catch(() => {
-          // If offline and requesting navigation (HTML page), return root cached app shell
-          if (event.request.mode === 'navigate') {
-            return caches.match('/index.html') || caches.match('/');
-          }
-          return cachedResponse;
-        });
+        .catch(async () => {
+          const cache = await caches.open(CACHE_NAME);
+          return (await cache.match('/index.html')) || (await cache.match('/'));
+        })
+    );
+    return;
+  }
 
-      return cachedResponse || fetchPromise;
+  // 3. Static App Shell & Assets (Images, Icons, Manifest, Fonts)
+  event.respondWith(
+    caches.match(event.request).then((cachedResponse) => {
+      if (cachedResponse) {
+        // Return cached and revalidate in background
+        fetch(event.request)
+          .then((networkResponse) => {
+            if (networkResponse && networkResponse.status === 200 && event.request.method === 'GET') {
+              caches.open(CACHE_NAME).then((cache) => {
+                cache.put(event.request, networkResponse);
+              });
+            }
+          })
+          .catch(() => {});
+        return cachedResponse;
+      }
+
+      // Not in cache, fetch from network
+      return fetch(event.request).then((networkResponse) => {
+        if (networkResponse && networkResponse.status === 200 && event.request.method === 'GET') {
+          const toCache = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, toCache);
+          });
+        }
+        return networkResponse;
+      });
     })
   );
 });

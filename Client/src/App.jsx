@@ -135,7 +135,7 @@ export default function App() {
       {/* Offline banner */}
       <OfflineBanner
         isOffline={isOffline}
-        isCached={isCached}
+        isCached={isCached && (isOffline || !!error)}
         cityName={weatherData?.location?.name}
         lastUpdated={weatherData?.lastUpdated}
         onRefresh={handleRefresh}

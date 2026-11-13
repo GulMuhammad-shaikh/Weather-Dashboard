@@ -1,7 +1,7 @@
 {
   "id": "/",
   "short_name": "WeatherPulse",
-  "name": "WeatherPulse - Modern Weather Dashboard",
+  "name": "WeatherPulse — Modern Weather Dashboard",
   "description": "WeatherPulse - Responsive, installable weather dashboard with 5-day forecasts, offline support, and morning alerts.",
   "start_url": "/",
   "scope": "/",
@@ -11,6 +11,12 @@
   "theme_color": "#0ea5e9",
   "categories": ["weather", "utilities"],
   "icons": [
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "64x64",
+      "purpose": "any"
+    },
     {
       "src": "/icon-192.png",
       "type": "image/png",

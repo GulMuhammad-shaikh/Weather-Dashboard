@@ -1,3 +1,10 @@
+const API_BASE_URL = 
+  import.meta.env.VITE_API_URL || 
+  import.meta.env.VITE_API_BASE_URL || 
+  (typeof window !== 'undefined' && window.location.hostname.includes('vercel.app')
+    ? 'https://weather-dashboard-backend-one.vercel.app'
+    : '');
+
 const CACHE_LAST_WEATHER = 'weatherpulse_last_weather';
 const CACHE_LAST_CITY = 'weatherpulse_last_city';
 const CACHE_FAVORITES = 'weatherpulse_cached_favorites';
@@ -13,7 +20,7 @@ export async function fetchWeather(lat, lon, city = '') {
       params.append('city', city);
     }
 
-    const res = await fetch(`/api/weather/current?${params.toString()}`);
+    const res = await fetch(`${API_BASE_URL}/api/weather/current?${params.toString()}`);
     if (!res.ok) {
       const errData = await res.json().catch(() => ({}));
       throw new Error(errData.message || `Weather fetch failed: ${res.statusText}`);
@@ -81,7 +88,7 @@ export async function searchCities(query) {
   }
 
   try {
-    const res = await fetch(`/api/weather/search?q=${encodeURIComponent(trimmed)}`);
+    const res = await fetch(`${API_BASE_URL}/api/weather/search?q=${encodeURIComponent(trimmed)}`);
     const json = await res.json().catch(() => ({}));
 
     if (!res.ok) {
@@ -105,7 +112,7 @@ export async function searchCities(query) {
 
 export async function getFavorites() {
   try {
-    const res = await fetch('/api/favorites');
+    const res = await fetch(`${API_BASE_URL}/api/favorites`);
     if (!res.ok) throw new Error('Favorites request failed');
     const data = await res.json();
     try {
@@ -125,7 +132,7 @@ export async function getFavorites() {
 
 export async function addFavorite(city) {
   try {
-    const res = await fetch('/api/favorites', {
+    const res = await fetch(`${API_BASE_URL}/api/favorites`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(city)
@@ -140,7 +147,7 @@ export async function addFavorite(city) {
 
 export async function removeFavorite(id) {
   try {
-    const res = await fetch(`/api/favorites/${id}`, {
+    const res = await fetch(`${API_BASE_URL}/api/favorites/${id}`, {
       method: 'DELETE'
     });
     if (!res.ok) throw new Error('Failed to remove favorite');
@@ -152,14 +159,14 @@ export async function removeFavorite(id) {
 }
 
 export async function getVapidPublicKey() {
-  const res = await fetch('/api/notifications/vapid-public-key');
+  const res = await fetch(`${API_BASE_URL}/api/notifications/vapid-public-key`);
   if (!res.ok) throw new Error('Failed to fetch VAPID key');
   const data = await res.json();
   return data.publicKey;
 }
 
 export async function subscribeToPush(subscription, cityName, lat, lon, notificationTime = '08:00') {
-  const res = await fetch('/api/notifications/subscribe', {
+  const res = await fetch(`${API_BASE_URL}/api/notifications/subscribe`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -175,7 +182,7 @@ export async function subscribeToPush(subscription, cityName, lat, lon, notifica
 }
 
 export async function sendTestPushNotification(subscription, cityName) {
-  const res = await fetch('/api/notifications/test', {
+  const res = await fetch(`${API_BASE_URL}/api/notifications/test`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ subscription, cityName })

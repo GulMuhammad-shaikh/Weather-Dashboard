@@ -2,16 +2,47 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    
+    <!-- Primary Meta Tags -->
+    <title>WeatherPulse — Live Forecasts &amp; Smart Weather Dashboard</title>
+    <meta name="title" content="WeatherPulse — Live Forecasts &amp; Smart Weather Dashboard" />
+    <meta name="description" content="WeatherPulse is a responsive, installable Progressive Web App (PWA) delivering real-time atmospheric conditions, interactive 24-hour temperature spline curves, 5-day forecasts, and scheduled morning weather alerts." />
+    <meta name="keywords" content="WeatherPulse, weather dashboard, live forecast, pwa, 24-hour weather, 5-day forecast, air quality index, UV index, weather app" />
+    <meta name="author" content="Gul Muhammad Shaikh" />
+    <meta name="theme-color" content="#0ea5e9" />
+
+    <!-- Open Graph / Facebook / WhatsApp -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://weather-dashboard-mja4.vercel.app/" />
+    <meta property="og:title" content="WeatherPulse — Live Forecasts &amp; Smart Weather Dashboard" />
+    <meta property="og:description" content="Real-time atmospheric conditions, interactive 24-hour temperature spline charts, 5-day forecasts, and offline resilience." />
+    <meta property="og:image" content="/icon-512.png" />
+    <meta property="og:site_name" content="WeatherPulse" />
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:url" content="https://weather-dashboard-mja4.vercel.app/" />
+    <meta property="twitter:title" content="WeatherPulse — Live Forecasts &amp; Smart Weather Dashboard" />
+    <meta property="twitter:description" content="Real-time atmospheric conditions, interactive 24-hour temperature spline charts, 5-day forecasts, and offline resilience." />
+    <meta property="twitter:image" content="/icon-512.png" />
+
+    <!-- Favicon & Icons -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="apple-touch-icon" href="/icon-192.png" />
     <link rel="manifest" href="/manifest.json" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <meta name="theme-color" content="#0ea5e9" />
-    <meta name="description" content="WeatherPulse - Responsive, installable weather dashboard with 5-day forecasts, offline support, and morning alerts." />
+
+    <!-- Apple & Mobile PWA Enhancements -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="WeatherPulse" />
+    <meta name="application-name" content="WeatherPulse" />
+    <meta name="format-detection" content="telephone=no" />
+
+    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <title>WeatherPulse • Modern Weather Dashboard</title>
   </head>
   <body class="bg-slate-950 text-slate-100 antialiased selection:bg-cyan-500 selection:text-white min-h-screen">
     <div id="root"></div>
@@ -22,7 +53,6 @@
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('/sw.js')
             .then((registration) => {
-              // Check for update immediately
               registration.update();
             })
             .catch((err) => {

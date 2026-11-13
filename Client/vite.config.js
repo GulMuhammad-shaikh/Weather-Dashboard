@@ -8,6 +8,11 @@ export default defineConfig({
     tailwindcss(),
     react()
   ],
+  build: {
+    target: ['es2020', 'edge88', 'firefox78', 'chrome87', 'safari14'],
+    cssTarget: 'chrome80',
+    sourcemap: false
+  },
   server: {
     port: 5173,
     proxy: {

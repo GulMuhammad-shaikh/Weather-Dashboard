@@ -48,25 +48,13 @@
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
     <script>
-      // Service Worker Registration for PWA & Push Notifications
+      // Safe Service Worker Registration for PWA & Push Notifications
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('/sw.js')
-            .then((registration) => {
-              registration.update();
-            })
             .catch((err) => {
               console.warn('ServiceWorker registration error:', err);
             });
-        });
-
-        // Automatically reload when a new service worker claims control
-        let refreshing = false;
-        navigator.serviceWorker.addEventListener('controllerchange', () => {
-          if (!refreshing) {
-            refreshing = true;
-            window.location.reload();
-          }
         });
       }
     </script>

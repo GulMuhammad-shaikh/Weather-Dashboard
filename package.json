@@ -1,0 +1,15 @@
+{
+  "name": "weatherboard-root",
+  "version": "1.0.0",
+  "description": "WeatherBoard - MERN Stack Weather Dashboard with Offline PWA & Push Notifications",
+  "scripts": {
+    "server": "npm --prefix Server start",
+    "server:dev": "npm --prefix Server run dev",
+    "client": "npm --prefix Client run dev",
+    "client:build": "npm --prefix Client run build",
+    "install:all": "npm --prefix Server install && npm --prefix Client install"
+  },
+  "keywords": ["mern", "weather", "pwa", "push-notifications", "react", "mongodb"],
+  "author": "",
+  "license": "MIT"
+}

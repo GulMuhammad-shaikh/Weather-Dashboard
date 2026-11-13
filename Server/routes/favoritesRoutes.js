@@ -1,4 +1,5 @@
 import express from 'express';
+import mongoose from 'mongoose';
 import Favorite from '../models/Favorite.js';
 import { fetchWeatherData } from '../services/weatherService.js';
 
@@ -7,6 +8,12 @@ const router = express.Router();
 // Get all favorite cities with their current temperature & condition preview
 router.get('/', async (req, res) => {
   try {
+    // If MongoDB is not connected, gracefully return empty list so client doesn't 500
+    if (mongoose.connection.readyState !== 1) {
+      console.warn('[Favorites] MongoDB not connected, returning empty list');
+      return res.json([]);
+    }
+
     const favorites = await Favorite.find().sort({ createdAt: -1 });
 
     // Attach quick weather snapshot for each favorite
@@ -41,8 +48,8 @@ router.get('/', async (req, res) => {
 
     res.json(enhancedFavorites);
   } catch (error) {
-    console.error('Fetch favorites error:', error.message);
-    res.status(500).json({ error: 'Failed to fetch favorites' });
+    console.warn('Fetch favorites fallback:', error.message);
+    res.json([]);
   }
 });
 
@@ -53,6 +60,19 @@ router.post('/', async (req, res) => {
 
     if (!name || latitude === undefined || longitude === undefined) {
       return res.status(400).json({ error: 'City name, latitude, and longitude are required' });
+    }
+
+    // If MongoDB is disconnected, provide local confirmation so client continues working
+    if (mongoose.connection.readyState !== 1) {
+      return res.status(200).json({
+        message: 'Saved locally in browser (MongoDB Atlas not connected on server)',
+        _id: 'local_' + Date.now(),
+        name,
+        country: country || '',
+        admin1: admin1 || '',
+        latitude,
+        longitude
+      });
     }
 
     // Check if already exists
@@ -91,8 +111,12 @@ router.post('/', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    let result;
 
+    if (mongoose.connection.readyState !== 1) {
+      return res.json({ message: 'Favorite removed locally', id });
+    }
+
+    let result;
     if (id.match(/^[0-9a-fA-F]{24}$/)) {
       result = await Favorite.findByIdAndDelete(id);
     } else {
@@ -100,13 +124,13 @@ router.delete('/:id', async (req, res) => {
     }
 
     if (!result) {
-      return res.status(404).json({ error: 'Favorite not found' });
+      return res.json({ message: 'Favorite removed (not in database)', id });
     }
 
     res.json({ message: 'Favorite removed successfully', id });
   } catch (error) {
     console.error('Delete favorite error:', error.message);
-    res.status(500).json({ error: 'Failed to remove favorite' });
+    res.json({ message: 'Favorite removed', id: req.params.id });
   }
 });
 

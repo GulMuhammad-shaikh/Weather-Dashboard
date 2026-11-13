@@ -1,18 +1,22 @@
 import webpush from 'web-push';
 import Subscription from '../models/Subscription.js';
 
-const publicVapidKey = process.env.VAPID_PUBLIC_KEY;
-const privateVapidKey = process.env.VAPID_PRIVATE_KEY;
+// Default VAPID keys for zero-config fallback if env variables omitted on Vercel
+const DEFAULT_VAPID_PUBLIC = 'BHqN9CRJ1UlbAn-ZhyCVONrR7T-oFWP_sbL7Fl0IfdVEmoq3cPsiQKj-OiDaq8f4UwAcFXTTbKJ-PHsa1pIiqa8';
+const DEFAULT_VAPID_PRIVATE = 'Pnx1fVmKcWgEkyx5fRGr5FzOww46Lir2TVa7veqC-C8';
+
+const publicVapidKey = process.env.VAPID_PUBLIC_KEY || DEFAULT_VAPID_PUBLIC;
+const privateVapidKey = process.env.VAPID_PRIVATE_KEY || DEFAULT_VAPID_PRIVATE;
 const mailto = process.env.VAPID_MAILTO || 'mailto:admin@weatherpulse.local';
 
-if (publicVapidKey && privateVapidKey) {
+try {
   webpush.setVapidDetails(mailto, publicVapidKey, privateVapidKey);
-} else {
-  console.warn('⚠️ VAPID keys are missing. Push notifications will not send.');
+} catch (e) {
+  console.warn('⚠️ Could not set VAPID details:', e.message);
 }
 
 export function getPublicVapidKey() {
-  return process.env.VAPID_PUBLIC_KEY;
+  return publicVapidKey;
 }
 
 // Send push notification helper
@@ -35,7 +39,9 @@ export async function sendPush(subscriptionDoc, payload) {
     // If subscription is expired or unsubscribed (410 Gone or 404 Not Found), purge it
     if (err.statusCode === 410 || err.statusCode === 404) {
       console.log('Purging expired subscription:', subscriptionDoc.endpoint);
-      await Subscription.deleteOne({ endpoint: subscriptionDoc.endpoint });
+      try {
+        await Subscription.deleteOne({ endpoint: subscriptionDoc.endpoint });
+      } catch {}
     }
     return { success: false, error: err.message, statusCode: err.statusCode };
   }
@@ -48,32 +54,34 @@ export async function sendDailyWeatherNotification(subscriptionDoc, weatherData)
 
   const payload = {
     title: `🌤️ Morning Weather for ${locationName}`,
-    body: `${current.weatherText} • ${current.temperature}°C (Feels like ${current.apparentTemperature}°C). High ${weatherData.daily[0]?.maxTemp}°C / Low ${weatherData.daily[0]?.minTemp}°C. Have a wonderful day!`,
+    body: `Today: ${current.weatherText}, ${current.temperature}°C (Feels ${current.apparentTemperature}°C). Wind: ${current.windSpeed} km/h. Rain chance: ${current.precipitation > 0 ? 'High' : 'Low'}.`,
     icon: '/icon-192.png',
     badge: '/icon-192.png',
     data: {
-      url: '/',
-      cityName: locationName,
-      timestamp: Date.now()
+      url: `/?city=${encodeURIComponent(locationName)}`
     }
   };
 
-  return sendPush(subscriptionDoc, payload);
+  return await sendPush(subscriptionDoc, payload);
 }
 
-// Send instant test notification
-export async function sendTestWeatherNotification(subscriptionDoc) {
+// Send immediate test alert to verify notification pipeline
+export async function sendTestWeatherNotification(subscription, cityName = 'Your City') {
   const payload = {
-    title: `⚡ WeatherPulse Alert: ${subscriptionDoc.cityName || 'Alert'}`,
-    body: `Push notifications are active! You will receive daily morning forecasts for ${subscriptionDoc.cityName || 'your city'}.`,
+    title: `🌤️ WeatherPulse Test Alert`,
+    body: `Push alerts are working correctly for ${cityName}! You will receive daily morning weather summaries here.`,
     icon: '/icon-192.png',
     badge: '/icon-192.png',
-    data: {
-      url: '/',
-      cityName: subscriptionDoc.cityName,
-      timestamp: Date.now()
+    data: { url: '/' }
+  };
+
+  const pushSubscription = {
+    endpoint: subscription.endpoint,
+    keys: {
+      p256dh: subscription.keys.p256dh,
+      auth: subscription.keys.auth
     }
   };
 
-  return sendPush(subscriptionDoc, payload);
+  return await webpush.sendNotification(pushSubscription, JSON.stringify(payload));
 }

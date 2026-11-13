@@ -22,11 +22,21 @@
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('/sw.js')
             .then((registration) => {
-              console.log('✅ ServiceWorker registered with scope:', registration.scope);
+              // Check for update immediately
+              registration.update();
             })
             .catch((err) => {
-              console.warn('⚠️ ServiceWorker registration failed:', err);
+              console.warn('ServiceWorker registration error:', err);
             });
+        });
+
+        // Automatically reload when a new service worker claims control
+        let refreshing = false;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (!refreshing) {
+            refreshing = true;
+            window.location.reload();
+          }
         });
       }
     </script>

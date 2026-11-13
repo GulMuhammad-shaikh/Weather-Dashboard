@@ -9,7 +9,7 @@ import { initScheduler } from './services/scheduler.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/weatherboard';
+const MONGODB_URI = process.env.MONGODB_URI || (process.env.NODE_ENV === 'production' ? '' : 'mongodb://127.0.0.1:27017/weatherboard');
 
 // Middleware
 app.use(cors());
@@ -17,9 +17,16 @@ app.use(express.json());
 
 // Serverless-friendly MongoDB connection cache
 let cachedDbPromise = null;
+let lastMongoError = null;
+
 export async function connectToDatabase() {
   if (mongoose.connection.readyState >= 1) {
     return mongoose.connection;
+  }
+
+  if (!MONGODB_URI) {
+    lastMongoError = new Error('MONGODB_URI environment variable is NOT set in Vercel. Please add MONGODB_URI in Vercel Settings > Environment Variables, then Redeploy.');
+    return null;
   }
 
   if (!cachedDbPromise) {
@@ -27,16 +34,41 @@ export async function connectToDatabase() {
       serverSelectionTimeoutMS: 5000,
       bufferCommands: false
     }).then((conn) => {
+      lastMongoError = null;
       console.log('✅ Connected to MongoDB Atlas/Database');
       return conn;
     }).catch((err) => {
       cachedDbPromise = null;
+      lastMongoError = err;
       console.error('❌ MongoDB Connection Error:', err.message);
       throw err;
     });
   }
 
   return cachedDbPromise;
+}
+
+// Helper to provide clear diagnostic message in health/root endpoint
+function getMongoDiagnostics() {
+  const readyState = mongoose.connection.readyState;
+  const isEnvConfigured = Boolean(process.env.MONGODB_URI);
+
+  let explanation = '';
+  if (readyState === 1) {
+    explanation = 'Connected to MongoDB Atlas successfully';
+  } else if (!isEnvConfigured) {
+    explanation = 'MONGODB_URI is missing in Vercel Environment Variables. Add MONGODB_URI in Vercel Settings > Environment Variables, then click Redeploy.';
+  } else if (lastMongoError) {
+    explanation = lastMongoError.message;
+  } else {
+    explanation = 'Connecting or network access blocked in Atlas (Ensure 0.0.0.0/0 is in Atlas Network Access)';
+  }
+
+  return {
+    status: readyState === 1 ? 'connected' : 'disconnected',
+    isEnvConfigured,
+    diagnostic: explanation
+  };
 }
 
 // Request logging & auto-connect DB
@@ -46,14 +78,20 @@ app.use(async (req, res, next) => {
     try {
       await connectToDatabase();
     } catch (e) {
-      // Non-blocking: Weather endpoints work even if DB is connecting
+      // Non-blocking
     }
   }
   next();
 });
 
 // Root welcome & API documentation endpoint
-app.get('/', (req, res) => {
+app.get('/', async (req, res) => {
+  try {
+    await connectToDatabase();
+  } catch {}
+
+  const mongoInfo = getMongoDiagnostics();
+
   res.json({
     status: 'online',
     appName: 'WeatherPulse Backend API',
@@ -65,7 +103,8 @@ app.get('/', (req, res) => {
       favorites: '/api/favorites',
       notifications: '/api/notifications'
     },
-    mongoStatus: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+    mongoStatus: mongoInfo.status,
+    mongoDiagnostics: mongoInfo.diagnostic,
     timestamp: new Date().toISOString()
   });
 });
@@ -75,10 +114,14 @@ app.get('/api/health', async (req, res) => {
   try {
     await connectToDatabase();
   } catch {}
+
+  const mongoInfo = getMongoDiagnostics();
+
   res.json({
     status: 'online',
     appName: 'WeatherPulse API',
-    mongoStatus: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+    mongoStatus: mongoInfo.status,
+    mongoDiagnostics: mongoInfo.diagnostic,
     timestamp: new Date().toISOString()
   });
 });
@@ -89,13 +132,15 @@ app.use('/api/favorites', favoritesRoutes);
 app.use('/api/notifications', notificationRoutes);
 
 // Initial connect & scheduler init
-connectToDatabase()
-  .then(() => {
-    initScheduler();
-  })
-  .catch((err) => {
-    console.warn('⚠️ Server running. Weather endpoints available; favorites & push require MongoDB.');
-  });
+if (MONGODB_URI) {
+  connectToDatabase()
+    .then(() => {
+      initScheduler();
+    })
+    .catch((err) => {
+      console.warn('⚠️ Server running. Weather endpoints available; favorites & push require MongoDB.');
+    });
+}
 
 // Start Express Server
 app.listen(PORT, () => {

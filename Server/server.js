@@ -21,6 +21,23 @@ app.use((req, res, next) => {
   next();
 });
 
+// Root welcome & API documentation endpoint
+app.get('/', (req, res) => {
+  res.json({
+    status: 'online',
+    appName: 'WeatherPulse Backend API',
+    description: 'REST API for WeatherPulse PWA weather dashboard',
+    endpoints: {
+      health: '/api/health',
+      currentWeather: '/api/weather/current?city=Karachi',
+      searchCities: '/api/weather/search?q=London',
+      favorites: '/api/favorites',
+      notifications: '/api/notifications'
+    },
+    timestamp: new Date().toISOString()
+  });
+});
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({
@@ -52,3 +69,5 @@ mongoose.connect(MONGODB_URI)
 app.listen(PORT, () => {
   console.log(`🌤️ WeatherPulse Backend Server running on http://localhost:${PORT}`);
 });
+
+export default app;
